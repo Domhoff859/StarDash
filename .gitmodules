@@ -1,0 +1,3 @@
+[submodule "citation/closed-symmetry-loop"]
+	path = citation/closed-symmetry-loop
+	url = https://github.com/jesserichterklug/closed-symmetry-loop.git
