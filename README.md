@@ -3,6 +3,7 @@ This is a project done for the Robot Vision Course.
 
 It uses the closed-symmetrie-loop in [Citation](#Citation) as a basis and rewrites the dataloader, star and dash representation to work without tensorflow or pytorch.
 
+The dataloader provided uses the BOP file standard. It is optional and can be replaced by any other dataloader TODO
 
 ## Citation
 

@@ -1,0 +1,57 @@
+version: 1
+new_file: False
+
+# Define formatters for log messages
+formatters:
+  # Format how the console output schould look like
+  console_formatter:
+    class: colorlog.ColoredFormatter
+    log_colors:
+      DEBUG: fg_blue
+      INFO: fg_green
+      WARNING: fg_yellow,bold
+      ERROR: fg_red,bold
+      CRITICAL: bg_white,fg_red,bold
+    format: '%(log_color)s%(levelname)s%(reset)s - %(fg_blue)s%(name)s%(reset)s - %(fg_cyan)s%(funcName)s%(reset)s - %(message)s'
+  # Format how the file output schould look like
+  file_formatter:
+    class: logging.Formatter
+    format: '%(asctime)s - %(name)s - %(funcName)s - %(lineno)d - %(levelname)s - %(message)s'
+
+# Define handlers for log messages
+handlers:
+  console_handler:
+    class: colorlog.StreamHandler
+    level: INFO
+    formatter: console_formatter
+    stream: ext://sys.stdout
+
+  file_handler:
+    class: logging.FileHandler
+    level: DEBUG
+    formatter: file_formatter
+    filename: ./log/file.log
+
+
+# Define loggers for different modules
+loggers:
+  Dataloader:
+    level: DEBUG
+    handlers: [console_handler, file_handler]
+    propagate: no
+  
+  Dash:
+    level: DEBUG
+    handlers: [console_handler, file_handler]
+    propagate: no
+
+  Star:
+    level: DEBUG
+    handlers: [console_handler, file_handler]
+    propagate: no
+
+
+# Define the root logger
+root:
+  level: DEBUG
+  handlers: [console_handler, file_handler]

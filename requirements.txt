@@ -1,0 +1,7 @@
+numpy
+scipy
+matplotlib
+pillow
+tqdm
+colorlog
+pyyaml
