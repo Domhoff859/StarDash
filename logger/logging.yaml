@@ -50,6 +50,11 @@ loggers:
     handlers: [console_handler, file_handler]
     propagate: no
 
+  Main:
+    level: DEBUG
+    handlers: [console_handler, file_handler]
+    propagate: no
+
 
 # Define the root logger
 root:

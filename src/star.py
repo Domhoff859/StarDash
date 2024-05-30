@@ -28,7 +28,7 @@ rotation axis as they all are equivalent under symmetry.
 import numpy as np
 import math
 
-import utils
+import src.utils as utils
 
 def collapses_obj_to_dot_symmetry(obj, x_factor=1, y_factor=1, z_factor=1):
     R = utils.eye(3, batch_shape=obj.shape[:-1])

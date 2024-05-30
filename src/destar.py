@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-import utils
+import src.utils as utils
 
 def get_obj_star0_from_obj_star(obj_star, x_factor=1, y_factor=1, z_factor=1):
     R = utils.eye(3, batch_shape=obj_star.shape[:-1])
