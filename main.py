@@ -1,10 +1,9 @@
-import json
 import logging
-import os
-import pathlib
-import numpy as np
-from src import star, dash, utils
+
+from src.dash import DashRepresentation
+from src.star import StarRepresentation
 from src.dataloader import DataLoader
+from src.utils import dataset_conversion_layers
 from logger.custom_logging import configure_logger
 
 
@@ -34,13 +33,21 @@ class StarDash:
         self.object_ids: list = self.dataloader.get_object_ids()
         self.model_info: dict = self.dataloader.load_model_info(object_ids=self.object_ids)
         
+        self.star = StarRepresentation()
+        self.dash = DashRepresentation()
+        
     def run(self):
+        # for object_id in self.object_ids:
+        object_id = self.object_ids[0]
         
-        found_data: list[dict] = self.dataloader.load_gt_data(self.object_ids[0])
-        logger.info(f'Found data for {len(found_data)} occurencies of object {self.object_ids[0]}')
+        # Load the ground truth data
+        found_data: list[dict] = self.dataloader.load_gt_data(object_id)
+        logger.info(f'Found data for {len(found_data)} occurencies of object {object_id}')
         
-        for elem in self.dataloader.generate_data():
-            logger.error(elem)
+        for element in self.dataloader.generate_data():
+            inputs, po_image, isvalid, depth, segmentation = dataset_conversion_layers(element, self.xyDim, self.xyDim, self.model_info[object_id], self.strides)
+
+            break
         
         
     

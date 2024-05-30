@@ -35,7 +35,6 @@ class DataLoader():
         # Initialize the found data
         self.found_data: list[dict] = []
         
-        
         # Get all folders in the dataset path
         folders: list[str] = [f.path for f in os.scandir(self.dataset_path) if f.is_dir()]
         
@@ -216,7 +215,7 @@ class DataLoader():
             
         return img, depthimg, data_element["cam_K"], data_element['bbox_start'], data_element['bbox_dims']
     
-    def extract_training_item(self, loaded_data_element: tuple[np.array]) -> tuple[np.array]:
+    def extract_training_item(self, loaded_data_element: tuple[np.array]) -> dict:
         """
         Extract the training item from the loaded data element.
 
@@ -224,7 +223,7 @@ class DataLoader():
             loaded_data_element (tuple[np.array]): Loaded data element.
 
         Returns:
-            tuple[np.array]: Tuple of extracted data consisting of image, depth image, segmentation, camera matrix, camera rotation, camera translation, bounding box start and bounding box dimensions.
+            dict: Extracted data consisting of image, depth image, segmentation, camera matrix, coordinate offset, rotation matrix and translation.
         """
         # Extract the variables from the extracted_data_element
         img, depth, seg, cam_K, R, t, bbs, bbd = loaded_data_element
@@ -253,7 +252,15 @@ class DataLoader():
         transformed_depth = np.array(transformed_depth_pil)
         transformed_seg = np.array(transformed_seg_pil)
         
-        return transformed_img, transformed_depth, transformed_seg, cam_K, R, t, coord_K
+        output = {'rgb': transformed_img,
+                  'depth': transformed_depth,
+                  'segmentation': transformed_seg,
+                  'camera_matrix': cam_K,
+                  'coord_offset': coord_K,
+                  'rotationmatrix': R,
+                  'translation': t}
+        
+        return output
     
     def extract_test_item(self, loaded_data_element: tuple[np.array]) -> tuple[np.array]:
         """
@@ -342,5 +349,15 @@ class DataLoader():
             
             # Yield the batched data
             for elem in batched_d:
+                """
+                One element of the batched data consists of a dictionary with the following keys:
+                {'rgb': transformed_img,
+                 'depth': transformed_depth,
+                 'segmentation': transformed_seg,
+                 'camera_matrix': cam_K,
+                 'coord_offset': coord_K,
+                 'rotationmatrix': R,
+                 'translation': t}
+                """
                 yield elem
             
