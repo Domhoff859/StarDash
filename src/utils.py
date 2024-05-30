@@ -66,6 +66,7 @@ def change_angle_around_axis(axis, x, v_zero, factor, dot_product='bxyi, bxyi->b
     return np.squeeze(R @ np.expand_dims(x, axis=-1), axis=-1)
 
 def rot_matrix_from_angle(angle, axis):
+    #See: https://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/
     c = np.cos(angle)
     s = np.sin(angle)
     t = 1.0 - c
