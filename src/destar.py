@@ -3,6 +3,12 @@ import numpy as np
 
 import src.utils as utils
 
+class DestarRepresentation:
+    def __init__(self, model_info: dict) -> None:
+        # Set the model info
+        self.model_info = model_info
+        
+        
 def get_obj_star0_from_obj_star(obj_star, x_factor=1, y_factor=1, z_factor=1):
     R = utils.eye(3, batch_shape=obj_star.shape[:-1])
     obj_star = utils.change_angle_around_axis(R[2], obj_star, R[0], 1. / z_factor)

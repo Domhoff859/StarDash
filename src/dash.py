@@ -23,10 +23,10 @@ class DashRepresentation:
     Rray(i,j) is a matrix rotating the Z-axis onto the viewing ray of pixel (i, j). The viewing rays are defined by the camera calibration.
     Note that before this representation's usage the rotational offset must be reversed.
     """
-    def __init__(self):
-        pass
+    def __init__(self, model_info: dict) -> None:
+        self.model_info = model_info
     
-    def calculate(self, R, po_image, offset: float = 0.0) -> np.ndarray:
+    def calculate(self, object_id: str, R: np.ndarray, po_image: np.ndarray) -> np.ndarray:
         """
         Calculates the dash representation of an Object Point Image.
 
@@ -37,66 +37,6 @@ class DashRepresentation:
         Returns:
             po_dash: the dash representation of the po_image
         """
-        # return np.einsum('bij,byxj->byxi', R, po_image) + offset
-        return np.tensordot(po_image, R[0].T, axes=([3], [0])) + offset
-
-    def _is_nan_or_inf(self, x: np.ndarray) -> bool:
-        """
-        Check if the input array contains NaN or Inf values.
-
-        Args:
-            x (np.ndarray): The input array
-
-        Returns:
-            bool: True if the input array contains NaN or Inf values, False otherwise
-        """
-        if np.isnan(x).sum() > 0 or np.isinf(x).sum():
-            return True
-        return False
-
-    def _make_Rpxy(self, strides: int, shape, cam_K, coord_K):
-        c = cam_K[:,:2,2]
-
-        u, v = utils.generate_px_coordinates(shape, coord_K, strides)
-        coords_c = np.stack(
-            [
-                u - c[:,0][:,np.newaxis,np.newaxis],
-                v - c[:,1][:,np.newaxis,np.newaxis]
-            ],
-            axis=-1
-        )
-
-        f = np.stack([cam_K[:,0,0], cam_K[:,1,1]], axis=-1)
-        # Reshape f to match the dimensions required for broadcasting
-        f_reshaped = f[:, np.newaxis, np.newaxis]
-        # Concatenate along the last axis
-        coords_3d_with_z1 = np.concatenate(
-            [
-                coords_c / f_reshaped,
-                np.ones_like(coords_c[:, :, :, :1])
-            ],
-            axis=-1
-        )
-        if self._is_nan_or_inf(coords_3d_with_z1):
-            raise ValueError("coords_3d_with_z1 is not finite")
-
-        z = np.constant([0,0,1], dtype=coords_3d_with_z1.dtype)
-
-        axes = np.cross(z * np.ones_like(coords_3d_with_z1), coords_3d_with_z1)
-        axes /= np.linalg.norm(axes, axis=-1, keepdims=True) + 0.000001
-        if self._is_nan_or_inf(axes):
-            raise ValueError("axes is not finite")
-
-        angles = utils.angle_between(z, coords_3d_with_z1)
-        if self._is_nan_or_inf(angles):
-            raise ValueError("angles is not finite")
-
-        RpxRpy = utils.rot_matrix_from_angle(angles, axes)   
-        if self._is_nan_or_inf(RpxRpy):
-            raise ValueError("RpxRpy is not finite")
-        return RpxRpy
-
-    def remove_cam_effect(self, strides, v_cam, cam_K, coord_K):
-        RpxRpy = self._make_Rpxy(strides, v_cam.shape[1:3], cam_K, coord_K)
-        return np.einsum('bxyij, bxyj-> bxyi', RpxRpy, v_cam)
-
+        offset = self.model_info[object_id]["symmetries_discrete"][0][:3,-1] / 2. if len(self.model_info[object_id]["symmetries_discrete"]) > 0 else 0 
+        
+        return np.einsum('bij,byxj->byxi', R, po_image) + offset
