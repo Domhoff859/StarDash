@@ -24,6 +24,13 @@ class DashRepresentation:
     Note that before this representation's usage the rotational offset must be reversed.
     """
     def __init__(self, model_info: dict) -> None:
+        """
+        Initializes the DashRepresentation.
+
+        Args:
+            model_info (dict): Model info of all objects.
+        """
+        # Set the model info
         self.model_info = model_info
     
     def calculate(self, object_id: str, R: np.ndarray, po_image: np.ndarray) -> np.ndarray:

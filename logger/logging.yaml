@@ -49,6 +49,11 @@ loggers:
     level: DEBUG
     handlers: [console_handler, file_handler]
     propagate: no
+  
+  Destar:
+    level: DEBUG
+    handlers: [console_handler, file_handler]
+    propagate: no
 
   Utils:
     level: DEBUG

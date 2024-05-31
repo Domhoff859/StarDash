@@ -25,7 +25,7 @@ class StarDash:
         
         # Set the dimensions and strides
         self.xyDim: int = 112
-        self.strides: int = 2
+        self.strides: int = 1
         self.number_of_images: int = 0
         
         # Initialize the dataloader
@@ -41,7 +41,7 @@ class StarDash:
         
         self.star = StarRepresentation(self.model_info)
         self.dash = DashRepresentation(self.model_info)
-        # self.destar = DestarRepresentation(self.model_info)
+        self.destar = DestarRepresentation(self.model_info)
         
     def run(self):
         # for object_id in self.object_ids:
@@ -73,12 +73,12 @@ class StarDash:
             # Calculate the star and dash representations
             valid_star = self.star.calculate(object_id, valid_po)
             valid_dash = self.dash.calculate(object_id ,inputs['rotationmatrix'], valid_po)
-            # valid_destar = self.star.calculate(object_id, valid_star, valid_dash, isvalid, inputs['rotationmatrix'])
+            valid_destar = self.destar.calculate(object_id, valid_star, valid_dash, isvalid, inputs['rotationmatrix'])
 
             all_rgb.append(inputs['rgb'])
             all_star.append(valid_star)
             all_dash.append(valid_dash)
-            # all_destar.append(valid_destar)
+            all_destar.append(valid_destar)
             all_valid_po.append(valid_po)
             all_isvalid.append(isvalid)
             all_depth.append(depth)
@@ -86,8 +86,8 @@ class StarDash:
         
         all_rgb = np.squeeze(all_rgb, axis=1)
         all_star = np.squeeze(all_star, axis=1)
-        all_dash = np.squeeze(all_dash)
-        # all_destar = np.array(all_destar)
+        all_dash = np.squeeze(all_dash, axis=1)
+        all_destar = np.squeeze(all_destar, axis=1)
         all_valid_po = np.squeeze(all_valid_po, axis=1)
         all_isvalid = np.squeeze(all_isvalid, axis=1)
         all_depth = np.squeeze(all_depth, axis=1)
@@ -96,7 +96,7 @@ class StarDash:
         logger.warning(f'RGB shape: {all_rgb.shape}, Type: {all_rgb.dtype}')
         logger.warning(f'Star shape: {all_star.shape}, Type: {all_star.dtype}')
         logger.warning(f'Dash shape: {all_dash.shape}, Type: {all_dash.dtype}')
-        # logger.warning(f'Destar shape: {all_destar.shape}, Type: {all_destar.dtype}')
+        logger.warning(f'Destar shape: {all_destar.shape}, Type: {all_destar.dtype}')
         logger.warning(f'PO shape: {all_valid_po.shape}, Type: {all_valid_po.dtype}')
         logger.warning(f'Is Valid shape: {all_isvalid.shape}, Type: {all_isvalid.dtype}')
         logger.warning(f'Depth shape: {all_depth.shape}, Type: {all_depth.dtype}')
@@ -113,7 +113,7 @@ class StarDash:
             axarr[0, 2].set_title('Star Image')
             axarr[0, 2].imshow(all_star[picture])
             axarr[0, 3].set_title('Destar Image')
-            axarr[0, 3].imshow(all_rgb[picture])
+            axarr[0, 3].imshow(all_destar[picture])
             # axarr[0, 3].axis('off')  # Turn off axis for the empty subplot
             axarr[1, 0].set_title('Valid PO')
             axarr[1, 0].imshow(all_valid_po[picture])
@@ -127,48 +127,6 @@ class StarDash:
             plt.tight_layout()
             # Show the plot
             plt.show()
-        
-        
-        
-        
-    
-    
-
-
-
-# def main(dataset_path):
-#     xyDim = 112
-#     strides = 2
-    
-#     #Load model info, example: tless/models_eval/models_info.json
-#     with open(f'{dataset_path}/models_eval/models_info.json') as f:
-#         jsondata = json.load(f)
-    
-    
-#     for key, model_info in jsondata.items():
-#         try:
-#             model_info["symmetries_discrete"] = np.array([
-#                 np.array(sym).reshape((4, 4)) for sym in model_info["symmetries_discrete"]
-#             ])
-#             has_discrete_sym = True
-#         except KeyError:
-#             #model has no discrete symmetries
-#             has_discrete_sym = False
-            
-#         # isvalid, depth, segmentation are used for loss calculation, but not used for ground truth
-#         inputs, po_image, isvalid, depth, segmentation = utils.dataset_conversion_layers(xyDim, xyDim, model_info, strides)
-        
-#         if has_discrete_sym:
-#             offset = model_info["symmetries_discrete"][0][:3,-1] / 2.0
-#         else:
-#             offset = 0
-#         valid_dash = dash.calculate(
-#             inputs['rotationmatrix'],
-#             po_image,
-#             offset = offset
-#         )
-#         valid_star = star.calculate(model_info[key], po_image)
-#         #ToDo: Save star and dash images
 
 
 if __name__ == "__main__":

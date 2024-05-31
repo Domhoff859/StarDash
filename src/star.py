@@ -36,6 +36,12 @@ class StarRepresentation:
     rotation axis as they all are equivalent under symmetry.
     """
     def __init__(self, model_info: dict) -> None:
+        """
+        Initializes the StarRepresentation.
+
+        Args:
+            model_info (dict): Model info of all objects.
+        """
         # Set the model info
         self.model_info = model_info
     
