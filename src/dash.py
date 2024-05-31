@@ -1,5 +1,4 @@
 import numpy as np
-import src.utils as utils
 
 class DashRepresentation:
     """
@@ -33,7 +32,7 @@ class DashRepresentation:
         # Set the model info
         self.model_info = model_info
     
-    def calculate(self, object_id: str, R: np.ndarray, po_image: np.ndarray) -> np.ndarray:
+    def calculate(self, R: np.ndarray, po_image: np.ndarray, object_id: str = None) -> np.ndarray:
         """
         Calculates the dash representation of an Object Point Image.
 
@@ -44,6 +43,11 @@ class DashRepresentation:
         Returns:
             po_dash: the dash representation of the po_image
         """
-        offset = self.model_info[object_id]["symmetries_discrete"][0][:3,-1] / 2. if len(self.model_info[object_id]["symmetries_discrete"]) > 0 else 0 
+        if object_id is None:
+            model_info = self.model_info
+        else:
+            model_info = self.model_info[object_id]
+        
+        offset = model_info["symmetries_discrete"][0][:3,-1] / 2. if len(model_info["symmetries_discrete"]) > 0 else 0 
         
         return np.einsum('bij,byxj->byxi', R, po_image) + offset

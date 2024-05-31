@@ -3,7 +3,7 @@ from math import isclose
 
 import numpy as np
 
-import src.utils as utils
+from . import utils
 
 logger = logging.getLogger("Star")
 
@@ -68,7 +68,7 @@ class StarRepresentation:
         
         return obj
 
-    def calculate(self, object_id: str, po_image: np.ndarray) -> np.ndarray:
+    def calculate(self, po_image: np.ndarray, object_id: str=None) -> np.ndarray:
         """
         Calculates the star representation of an Object Point Image.
 
@@ -78,7 +78,10 @@ class StarRepresentation:
         Returns:
             po_star (np.ndarray): the star representation of the po_image
         """
-        model_info = self.model_info[object_id]
+        if object_id is None:
+            model_info = self.model_info
+        else: 
+            model_info = self.model_info[object_id]
         
         if model_info['symmetries_continuous']:
             logger.debug('Starring as symmetries_continuous')

@@ -45,7 +45,7 @@ class StarDash:
         
     def run(self):
         # for object_id in self.object_ids:
-        object_id = self.object_ids[0]
+        object_id = self.object_ids[5]
         logger.info(f'Working on object {object_id} of {self.object_ids[-1]}')
         
         # Load the ground truth data
@@ -53,8 +53,7 @@ class StarDash:
         self.number_of_images = len(found_data)
         logger.info(f'Found data for {self.number_of_images} occurencies of object {object_id}')
         
-        
-        
+        # Initialize the lists
         all_rgb = []
         all_star = []
         all_dash = []
@@ -71,10 +70,11 @@ class StarDash:
             inputs, valid_po, isvalid, depth, segmentation = dataset_conversion_layers(element, self.model_info[object_id], self.strides)
 
             # Calculate the star and dash representations
-            valid_star = self.star.calculate(object_id, valid_po)
-            valid_dash = self.dash.calculate(object_id ,inputs['rotationmatrix'], valid_po)
-            valid_destar = self.destar.calculate(object_id, valid_star, valid_dash, isvalid, inputs['rotationmatrix'])
+            valid_star = self.star.calculate(object_id=object_id, po_image=valid_po)
+            valid_dash = self.dash.calculate(object_id=object_id ,R=inputs['rotationmatrix'], po_image=valid_po)
+            valid_destar = self.destar.calculate(object_id=object_id, star=valid_star, dash=valid_dash, isvalid=isvalid, train_R=inputs['rotationmatrix'])
 
+            # Append the data to the lists
             all_rgb.append(inputs['rgb'])
             all_star.append(valid_star)
             all_dash.append(valid_dash)
@@ -84,6 +84,7 @@ class StarDash:
             all_depth.append(depth)
             all_segmentation.append(segmentation)
         
+        # Convert the lists to numpy arrays
         all_rgb = np.squeeze(all_rgb, axis=1)
         all_star = np.squeeze(all_star, axis=1)
         all_dash = np.squeeze(all_dash, axis=1)
@@ -93,6 +94,7 @@ class StarDash:
         all_depth = np.squeeze(all_depth, axis=1)
         all_segmentation = np.squeeze(all_segmentation, axis=1)
         
+        # Print the shapes and types of the arrays
         logger.warning(f'RGB shape: {all_rgb.shape}, Type: {all_rgb.dtype}')
         logger.warning(f'Star shape: {all_star.shape}, Type: {all_star.dtype}')
         logger.warning(f'Dash shape: {all_dash.shape}, Type: {all_dash.dtype}')
@@ -102,6 +104,7 @@ class StarDash:
         logger.warning(f'Depth shape: {all_depth.shape}, Type: {all_depth.dtype}')
         logger.warning(f'Segmentation shape: {all_segmentation.shape}, Type: {all_segmentation.dtype}')
         
+        # Display the images
         pic_numbers = np.random.randint(0, self.number_of_images, 1)
         for picture in pic_numbers:
             f, axarr = plt.subplots(2, 4)

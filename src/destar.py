@@ -2,7 +2,7 @@ import logging
 from math import isclose
 import numpy as np
 
-import src.utils as utils
+from . import utils
 
 logger = logging.getLogger("Destar")
 
@@ -21,7 +21,7 @@ class DestarRepresentation:
         # Set the number of instances
         self.num_instances = num_instances if num_instances is not None else 1
         
-    def calculate(self, object_id: str, star: np.ndarray, dash: np.ndarray, isvalid: np.ndarray, train_R: np.ndarray = None) -> np.ndarray:
+    def calculate(self, star: np.ndarray, dash: np.ndarray, isvalid: np.ndarray, train_R: np.ndarray = None, object_id: str = None) -> np.ndarray:
         """
         Calculate the Destar representation.
 
@@ -35,7 +35,10 @@ class DestarRepresentation:
         Returns:
             np.ndarray: Calculated Destar representation.
         """
-        model_info = self.model_info[object_id]
+        if object_id is None:
+            model_info = self.model_info
+        else:
+            model_info = self.model_info[object_id]
         
         if model_info["symmetries_continuous"]:
             logger.debug("Destarring as symmetries_continuous")
@@ -51,7 +54,7 @@ class DestarRepresentation:
             po_ = self.best_symmetrical_po(self.get_obj_star0_from_obj_star(star, z_factor=factor), factor, np.array([0,0,1], np.float32), train_R, model_info, star, dash, isvalid)
 
             offset = model_info["symmetries_discrete"][0][:3,-1] / 2.
-            logger.debug("Po was corrected by", -offset)
+            logger.debug(f"Po was corrected by {-offset}")
             return po_ - offset
 
         if isclose(model_info["symmetries_discrete"][0][1,1], 1, abs_tol=1e-3):
@@ -60,7 +63,7 @@ class DestarRepresentation:
             po_ = self.best_symmetrical_po(self.get_obj_star0_from_obj_star(star, y_factor=factor), factor, np.array([0,1,0], np.float32), train_R, model_info, star, dash, isvalid)
 
             offset = self.model_info["symmetries_discrete"][0][:3,-1] / 2.
-            logger.debug("Po was corrected by", -offset)
+            logger.debug(f"Po was corrected by {-offset}")
             return po_
         
         assert(False)        
@@ -125,12 +128,19 @@ class DestarRepresentation:
         for idx in np.ndindex(batch_shape):
             best_po[idx] = allp_pos[idx + (arg_min_expanded[idx],)]
 
-        o_wide_error = np.sum(np.min(allp_angle_diffs, axis=-1)[..., np.newaxis] * iseg[..., np.newaxis], axis=[1, 2], keepdims=True)
+        o_wide_error = np.sum(np.min(allp_angle_diffs, axis=-1)[..., np.newaxis] * iseg[..., np.newaxis], keepdims=True)
         arg_min = np.argmin(o_wide_error, axis=-1)
         arg_min_ = arg_min * iseg
+        arg_min_expanded_ = np.array(arg_min_[..., np.newaxis], np.int8)
+        result_shape = arg_min_.shape + (best_po.shape[-1],)
+        best_po2 = np.empty(result_shape, dtype=best_po.dtype)
+        
+        batch_dims = 3
+        batch_shape = best_po.shape[:batch_dims]
+        for idx in np.ndindex(batch_shape):
+            best_po2[idx] = best_po[idx + (arg_min_expanded_[idx],)]
 
-        best_po = np.take_along_axis(best_po, arg_min_[..., np.newaxis], axis=-2)
-        return np.sum(best_po * iseg[..., np.newaxis], axis=-2)
+        return np.sum(best_po2 * iseg[..., np.newaxis], axis=-2)
     
     def best_continues_po(self, star0: np.ndarray, axis: np.ndarray, train_R: np.ndarray, postar: np.ndarray, vo: np.ndarray, iseg: np.ndarray) -> np.ndarray:
         """
@@ -201,7 +211,6 @@ class DestarRepresentation:
         for idx in np.ndindex(batch_shape):
             best_po2[idx] = best_po[idx + (arg_min_expanded_[idx],)]
 
-        #best_po = np.take_along_axis(best_po, arg_min_[..., np.newaxis], axis=-2)
         return np.sum(best_po2 * iseg[..., np.newaxis], axis=-2)
     
     def get_obj_star0_from_obj_star(self, obj_star: np.ndarray, x_factor: int = 1, y_factor: int = 1, z_factor: int = 1) -> np.ndarray:
@@ -218,9 +227,9 @@ class DestarRepresentation:
             np.ndarray: Object star0 array.
         """
         R = utils.eye(3, batch_shape=obj_star.shape[:-1])
-        obj_star = utils.change_angle_around_axis(R[2], obj_star, R[0], 1. / z_factor)
-        obj_star = utils.change_angle_around_axis(R[1], obj_star, R[2], 1. / y_factor)
-        obj_star = utils.change_angle_around_axis(R[0], obj_star, R[1], 1. / x_factor)
+        obj_star = utils.change_angle_around_axis(R[..., 2], obj_star, R[..., 0], 1. / z_factor)
+        obj_star = utils.change_angle_around_axis(R[..., 1], obj_star, R[..., 2], 1. / y_factor)
+        obj_star = utils.change_angle_around_axis(R[..., 0], obj_star, R[..., 1], 1. / x_factor)
         return obj_star
 
     def direct_calc_z_dir(self, postar: np.ndarray, vo_image: np.ndarray, seg: np.ndarray) -> np.ndarray:
