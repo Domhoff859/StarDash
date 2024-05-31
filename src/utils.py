@@ -1,5 +1,8 @@
+import logging
 import numpy as np
 from typing import Tuple, Optional, Type, Dict
+
+logger = logging.getLogger('Utils')
 
 def eye(num_rows: int, num_columns: Optional[int] = None, batch_shape: Optional[Tuple[int]] = None, dtype: Type[float] = float) -> np.ndarray:
     """
@@ -37,6 +40,7 @@ def normalize(x: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: Normalized vector or array of vectors.
     """
+    # The 0.00001 is added to avoid division by zero
     mag = np.linalg.norm(x, axis=-1, keepdims=True) + 0.00001
     return x / mag
 
@@ -67,11 +71,14 @@ def angle_between(x: np.ndarray, y: np.ndarray, dot_product: str = 'i, bxyi->bxy
     """
     norm_x, norm_y = normalize(x), normalize(y)
     numerator = np.einsum(dot_product, norm_x, norm_y)
+    
     # Define the clipping boundaries
     min_val = 0.00001 - 1.0
     max_val = 1.0 - 0.00001
+    
     # Apply clipping to limit the values to the range [min_val, max_val]
     clipped_numerator = np.clip(numerator, min_val, max_val)
+    
     # Compute the arccosine of the clipped values
     return np.arccos(clipped_numerator)
 
@@ -88,18 +95,23 @@ def get_angle_around_axis(axis: np.ndarray, v_from: np.ndarray, v_to: np.ndarray
     Returns:
         np.ndarray: Angle around the axis between the input vectors or arrays of vectors.
     """
+    # Correct the vectors by removing the component along the axis
     corrected_v_from = cross_n(np.cross(axis, v_from), axis)
     corrected_v_to = cross_n(np.cross(axis, v_to), axis)
     
+    # Compute the angle between the corrected vectors
     angle = angle_between(corrected_v_from, corrected_v_to, dot_product=dot_product)
     
+    # Compute the new axis
     new_axis = cross_n(corrected_v_from, corrected_v_to)
     n = np.linalg.norm(new_axis + axis, axis=-1, keepdims=True)
-    #NumPy does not have an equivalent concept of gradient tracking or stopping gradients like TensorFlow does.
-    sign_correction_factor = np.squeeze(np.math.sign(n - 1.0), axis=-1)
+    
+    # Compute the sign correction factor
+    sign_correction_factor = np.squeeze(np.sign(n - 1.0), axis=-1)
+    
+    # Apply the sign correction factor to the angle
     angle *= np.minimum(sign_correction_factor * 2.0 + 1, 1)
     return angle
-
 
 def change_angle_around_axis(axis: np.ndarray, x: np.ndarray, v_zero: np.ndarray, factor: float, dot_product: str = 'bxyi, bxyi->bxy') -> np.ndarray:
     """
@@ -115,11 +127,12 @@ def change_angle_around_axis(axis: np.ndarray, x: np.ndarray, v_zero: np.ndarray
     Returns:
         np.ndarray: Vector or array of vectors with the changed angle around the axis.
     """
+    # Compute the factor and the current angle
     factor = factor if not np.isinf(factor) else 0
-    current_angle = get_angle_around_axis(axis, v_zero, x, dot_product=dot_product)# + np.pi
+    current_angle = get_angle_around_axis(axis, v_zero, x, dot_product=dot_product)
     angle_change = current_angle * (factor - 1) 
     R = rot_matrix_from_angle(angle_change, axis)
-    return np.squeeze(R @ np.expand_dims(x, axis=-1), axis=-1)
+    return np.squeeze(np.matmul(R, np.expand_dims(x, axis=-1)), axis=-1)
 
 def rot_matrix_from_angle(angle: np.ndarray, axis: np.ndarray) -> np.ndarray:
     """
@@ -136,25 +149,26 @@ def rot_matrix_from_angle(angle: np.ndarray, axis: np.ndarray) -> np.ndarray:
     c = np.cos(angle)
     s = np.sin(angle)
     t = 1.0 - c
-
-    part_one = c[..., np.newaxis, np.newaxis] * np.eye(3, dtype=c.dtype)
-    # We use np.einsum with the ellipsis notation (...)
-    # to perform element-wise multiplication of the axis array with itself.
-    # Resulting in:
-    # [x*x, x*y, x*z]
-    # [x*y, y*y, y*z]
-    # [x*z, y*z, z*z]
-    part_two = t[..., np.newaxis, np.newaxis] * np.einsum('...i,...j->...ij', axis, axis)
-
     x, y, z = axis[..., 0], axis[..., 1], axis[..., 2]
-    part_three = s[..., np.newaxis, np.newaxis] * np.array([
-        [0, -z, y],
-        [z, 0, -x],
-        [-y, x, 0]
-    ])
+    
+    # Compute the rotation matrix
+    part_one = c[..., np.newaxis, np.newaxis] * np.eye(3, dtype=c.dtype)
+    
+    # Compute the cross product matrix
+    part_two = t[..., np.newaxis, np.newaxis] * np.stack([
+        np.stack([x*x, x*y, x*z], axis=-1),
+        np.stack([x*y, y*y, y*z], axis=-1),
+        np.stack([x*z, y*z, z*z], axis=-1)
+    ], axis=-2)
 
-    return part_one + part_two - part_three
+    zero = np.zeros_like(z)
+    part_three = s[..., np.newaxis, np.newaxis] * np.stack([
+        np.stack([zero, -z, y], axis=-1),
+        np.stack([z, zero, -x], axis=-1),
+        np.stack([-y, x, zero], axis=-1)
+    ], axis=-2)
 
+    return part_one + part_two + part_three
 
 def generate_px_coordinates(shape: Tuple[int], coord_K: np.ndarray, strides: int = 1) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -191,19 +205,14 @@ def depth_based_cam_coords(depth: np.ndarray, cam_K: np.ndarray, coord_K: np.nda
         np.ndarray: Camera coordinates.
     """
     # Create coordinate grids using broadcasting
-    u = np.arange(depth.shape[2], dtype=np.float32) * coord_K[:, 0, 0] * strides + coord_K[:, 1, 0]
-    v = np.arange(depth.shape[1], dtype=np.float32) * coord_K[:, 0, 1] * strides + coord_K[:, 1, 1]
-    
-    # Reshape u and v to match the shape of depth
-    u = u[:, np.newaxis, np.newaxis]
-    v = v[:, np.newaxis, np.newaxis]
-    
+    u, v = generate_px_coordinates(shape=depth.shape[1:3], coord_K=coord_K, strides=strides)
+
     # Compute scaled coordinates
     scaled_coords = np.stack([u * depth, v * depth, depth], axis=-1)
     
     # Perform matrix multiplication using broadcasting
     inv_cam_K = np.linalg.inv(cam_K)
-    return inv_cam_K @ scaled_coords
+    return np.einsum('bij,bxyj->bxyi', inv_cam_K, scaled_coords)
 
 def cam_to_obj(R: np.ndarray, t: np.ndarray, cam_coords: np.ndarray) -> np.ndarray:
     """
@@ -218,9 +227,10 @@ def cam_to_obj(R: np.ndarray, t: np.ndarray, cam_coords: np.ndarray) -> np.ndarr
         np.ndarray: Object space coordinates.
     """
     # Expand dimensions of t to match the shape of cam_coords
-    t_expanded = t[:, np.newaxis, np.newaxis, :]
+    t_expanded = t[:, np.newaxis, np.newaxis]
+    
     # Perform matrix multiplication and subtraction
-    return R @ (cam_coords - t_expanded)
+    return np.einsum('bji,byxj->byxi', R, cam_coords - t_expanded)
 
 def obj_validity(image: np.ndarray, model_info: Dict[str, float]) -> np.ndarray:
     """
@@ -233,37 +243,22 @@ def obj_validity(image: np.ndarray, model_info: Dict[str, float]) -> np.ndarray:
     Returns:
         np.ndarray: Validity mask.
     """
-    obj_mins = 1.1 * np.array(
-        [
-            model_info["min_x"],
-            model_info["min_y"],
-            model_info["min_z"]
-        ],
-        dtype=np.float32
-    )
-    obj_maxs = 1.1 * np.array(
-        [
-            model_info["min_x"] + model_info["size_x"],
-            model_info["min_y"] + model_info["size_y"],
-            model_info["min_z"] + model_info["size_z"]
-        ],
-        dtype=np.float32
-    )
+    obj_mins = 1.1 * np.array(model_info['mins'], dtype=np.float32)
+    obj_maxs = 1.1 * np.array(model_info['maxs'], dtype=np.float32)
+    
     # Perform element-wise comparisons
     is_in_range = np.logical_and(np.less(obj_mins, image), np.less(image, obj_maxs))
     # Check if all dimensions are in range
-    is_valid = np.all(is_in_range, axis=-1, keepdims=True)
+    is_valid: np.ndarray = np.all(is_in_range, axis=-1, keepdims=True)
     # Convert boolean array to float32
     return is_valid.astype(np.float32)
 
-def dataset_conversion_layers(inputs: Dict[str, np.ndarray], xDim: int, yDim: int, model_info: Dict[str, float], strides: int = 1) -> Tuple[Dict[str, np.ndarray], np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def dataset_conversion_layers(inputs: Dict[str, np.ndarray], model_info: Dict[str, float], strides: int = 1) -> Tuple[Dict[str, np.ndarray], np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Convert input data to the desired format for dataset conversion.
     
     Parameters:
         inputs (Dict[str, np.ndarray]): Input data.
-        xDim (int): Width of the image.
-        yDim (int): Height of the image.
         model_info (Dict[str, float]): Model information.
         strides (int, optional): Strides for subsampling. Defaults to 1.
         
@@ -294,7 +289,7 @@ def dataset_conversion_layers(inputs: Dict[str, np.ndarray], xDim: int, yDim: in
     obj_image = cam_to_obj(inputs['rotationmatrix'], inputs['translation'], cam_coords)
     
     # Compute object validity mask
-    isvalid = obj_validity(obj_image)
+    isvalid = obj_validity(obj_image, model_info)
     
     # Apply segmentation mask and object validity
     isvalid = isvalid * segmentations

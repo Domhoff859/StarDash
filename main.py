@@ -1,5 +1,9 @@
 import logging
 
+import numpy as np
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+
 from src.dash import DashRepresentation
 from src.star import StarRepresentation
 from src.dataloader import DataLoader
@@ -21,6 +25,7 @@ class StarDash:
         # Set the dimensions and strides
         self.xyDim: int = 112
         self.strides: int = 2
+        self.number_of_images: int = 0
         
         # Initialize the dataloader
         self.dataloader: DataLoader = DataLoader(dataset_path=self.dataset_path, 
@@ -39,15 +44,71 @@ class StarDash:
     def run(self):
         # for object_id in self.object_ids:
         object_id = self.object_ids[0]
+        logger.info(f'Working on object {object_id} of {self.object_ids[-1]}')
         
         # Load the ground truth data
         found_data: list[dict] = self.dataloader.load_gt_data(object_id)
         logger.info(f'Found data for {len(found_data)} occurencies of object {object_id}')
         
-        for element in self.dataloader.generate_data():
-            inputs, po_image, isvalid, depth, segmentation = dataset_conversion_layers(element, self.xyDim, self.xyDim, self.model_info[object_id], self.strides)
+        self.number_of_images = len(found_data)
+        
+        all_rgb = []
+        all_depth = []
+        all_valid_po = []
+        all_isvalid = []
+        all_segmentation = []
+        
+        logger.info(f'Generating data for object {object_id}')
+        for element in tqdm(self.dataloader.generate_data(), total=self.number_of_images):
+            inputs, valid_po, isvalid, depth, segmentation = dataset_conversion_layers(element, self.model_info[object_id], self.strides)
 
-            break
+
+
+            all_rgb.append(inputs['rgb'])
+            all_valid_po.append(valid_po)
+            all_isvalid.append(isvalid)
+            all_depth.append(depth)
+            all_segmentation.append(segmentation)
+        
+        all_rgb = np.squeeze(all_rgb, axis=1)
+        all_valid_po = np.squeeze(all_valid_po, axis=1)
+        all_isvalid = np.squeeze(all_isvalid, axis=1)
+        all_depth = np.squeeze(all_depth, axis=1)
+        all_segmentation = np.squeeze(all_segmentation, axis=1)
+        
+        logger.warning(f'RGB shape: {all_rgb.shape}, Type: {all_rgb.dtype}')
+        logger.warning(f'PO shape: {all_valid_po.shape}, Type: {all_valid_po.dtype}')
+        logger.warning(f'Is Valid shape: {all_isvalid.shape}, Type: {all_isvalid.dtype}')
+        logger.warning(f'Depth shape: {all_depth.shape}, Type: {all_depth.dtype}')
+        logger.warning(f'Segmentation shape: {all_segmentation.shape}, Type: {all_segmentation.dtype}')
+        
+        pic_numbers = np.random.randint(0, self.number_of_images, 1)
+        for picture in pic_numbers:
+            f, axarr = plt.subplots(2, 4)
+            # Display images and set titles
+            axarr[0, 0].imshow(all_rgb[picture])
+            axarr[0, 0].set_title('RGB Image')
+            axarr[0, 1].imshow(all_rgb[picture])
+            axarr[0, 1].set_title('Dash Image')
+            axarr[0, 2].imshow(all_rgb[picture])
+            axarr[0, 2].set_title('Star Image')
+            axarr[0, 3].imshow(all_rgb[picture])
+            axarr[0, 3].set_title('Destar Image')
+            # axarr[0, 3].axis('off')  # Turn off axis for the empty subplot
+            axarr[1, 0].imshow(all_valid_po[picture])
+            axarr[1, 0].set_title('Valid PO')
+            axarr[1, 1].imshow(all_isvalid[picture])
+            axarr[1, 1].set_title('Is Valid')
+            axarr[1, 2].imshow(all_depth[picture])
+            axarr[1, 2].set_title('Depth Image')
+            axarr[1, 3].imshow(all_segmentation[picture])
+            axarr[1, 3].set_title('Segmentation')
+            # Adjust layout to make space for titles
+            plt.tight_layout()
+            # Show the plot
+            plt.show()
+        
+        
         
         
     

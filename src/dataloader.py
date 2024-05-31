@@ -43,9 +43,9 @@ class DataLoader():
         
         # Check if all the folders exist
         if len(folders) != len(sub_dataset_names):
-            logger.error(f'Expected {len(sub_dataset_names)} folders but found {len(folders)}')
-            logger.error(f'Expected folders: {sub_dataset_names}')
-            logger.error(f'Found folders: {folders}')
+            logger.error(f'Expected {len(sub_dataset_names)} folders but found {len(folders)}!',
+                         'Expected folders: {", ".join(sub_dataset_names)}\t',
+                         'Found folders: {", ".join(folders)}\t')
         
         # Set the dataset names
         self.sub_dataset_paths: list[Path] = folders
@@ -77,7 +77,6 @@ class DataLoader():
         """
         # Construct the path to load the models_info.json file
         path = Path(f'{self.dataset_path}{self.models_info_path}')
-        logger.debug(f"Path to load : {path}")
 
         # Load the object ids from the models_info.json file
         with open(path, 'r') as f:
@@ -182,7 +181,7 @@ class DataLoader():
         self.found_data = found_data
         return found_data
     
-    def load_training_data_item(self, data_element: dict) -> tuple[np.array]:
+    def load_training_data_item(self, data_element: dict) -> tuple[np.ndarray]:
         """
         Load the data item from the data element.
 
@@ -199,7 +198,7 @@ class DataLoader():
         seg = np.array(Image.open(f'{data_element["root"]}/mask_visib/{data_element["file_name"]}_{data_element["oi_name"]}.png'))
         return img, depthimg, seg, np.array(data_element["cam_K"]), np.array(data_element["cam_R_m2c"]), np.array(data_element["cam_t_m2c"]), np.array(data_element['bbox_start']), np.array(data_element['bbox_dims'])
     
-    def load_test_data_item(self, data_element: dict) -> tuple[np.array]:
+    def load_test_data_item(self, data_element: dict) -> tuple[np.ndarray]:
         """
         Load the data item from the data element.
 
@@ -215,7 +214,7 @@ class DataLoader():
             
         return img, depthimg, data_element["cam_K"], data_element['bbox_start'], data_element['bbox_dims']
     
-    def extract_training_item(self, loaded_data_element: tuple[np.array]) -> dict:
+    def extract_training_item(self, loaded_data_element: tuple[np.ndarray]) -> dict[str, np.ndarray]:
         """
         Extract the training item from the loaded data element.
 
@@ -252,17 +251,17 @@ class DataLoader():
         transformed_depth = np.array(transformed_depth_pil)
         transformed_seg = np.array(transformed_seg_pil)
         
-        output = {'rgb': transformed_img,
-                  'depth': transformed_depth,
-                  'segmentation': transformed_seg,
-                  'camera_matrix': cam_K,
-                  'coord_offset': coord_K,
-                  'rotationmatrix': R,
-                  'translation': t}
+        output = {'rgb': transformed_img[np.newaxis, :, :, :],
+                  'depth': transformed_depth[np.newaxis, :, :],
+                  'segmentation': transformed_seg[np.newaxis, :, :],
+                  'camera_matrix': cam_K[np.newaxis, :, :],
+                  'coord_offset': coord_K[np.newaxis, :, :],
+                  'rotationmatrix': R[np.newaxis, :, :],
+                  'translation': t[np.newaxis, :]}
         
         return output
     
-    def extract_test_item(self, loaded_data_element: tuple[np.array]) -> tuple[np.array]:
+    def extract_test_item(self, loaded_data_element: tuple[np.ndarray]) -> dict[str, np.ndarray]:
         """
         Extract the test item from the loaded data element.
 
@@ -295,7 +294,13 @@ class DataLoader():
         transformed_img = np.array(transformed_img_pil)
         transformed_depth = np.array(transformed_depth_pil)
         
-        return transformed_img, transformed_depth, cam_K, coord_K
+        output = {'rgb': transformed_img[np.newaxis, :, :, :],
+                  'depth': transformed_depth[np.newaxis, :, :],
+                  'camera_matrix': cam_K[np.newaxis, :, :],
+                  'coord_offset': coord_K[np.newaxis, :, :]
+                  }
+        
+        return output
     
     def batch_data(self, data_element: dict) -> list[dict]:
         """
@@ -351,13 +356,13 @@ class DataLoader():
             for elem in batched_d:
                 """
                 One element of the batched data consists of a dictionary with the following keys:
-                {'rgb': transformed_img,
-                 'depth': transformed_depth,
-                 'segmentation': transformed_seg,
-                 'camera_matrix': cam_K,
-                 'coord_offset': coord_K,
-                 'rotationmatrix': R,
-                 'translation': t}
+                {'rgb': transformed_img (1, yDim, xDim, 3),
+                 'depth': transformed_depth (1, yDim, xDim),
+                 'segmentation': transformed_seg (1, yDim, xDim),
+                 'camera_matrix': cam_K (1, 3, 3),
+                 'coord_offset': coord_K (1, 2, 2)
+                 'rotationmatrix': R (1, 3, 3),
+                 'translation': t (1, 3)}
                 """
                 yield elem
             
