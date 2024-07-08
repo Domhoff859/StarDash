@@ -185,10 +185,10 @@ class DestarRepresentation:
 
         allp_pos = np.einsum('byxojaki,byxoji->byxojak', R_betas, star0_under_ref)
         allp_pos = np.concatenate([allp_pos[..., 0, :], allp_pos[..., 1, :]], axis=-2)
-
+        
         allp_po_angles = utils.angle_between(allp_pos, ref['po'], 'byxosi, boji->byxosj')
         allp_angle_diffs = np.sum(self.angle_substraction(allp_po_angles, dash_angles[..., np.newaxis, :]) ** 2, axis=-1)
-
+        
         arg_min: np.ndarray = np.argmin(allp_angle_diffs, axis=-1)
         arg_min_expanded = arg_min[..., np.newaxis]
         result_shape = arg_min.shape + (allp_pos.shape[-1],)
@@ -250,9 +250,9 @@ class DestarRepresentation:
         b = (postar * seg)[...,2:,np.newaxis]
         Atb = np.matmul(A.T, b)
         
-        _AtA = np.sum(AtA, axis=[1, 2])
-        _Atb = np.sum(Atb, axis=[1, 2])
-        return np.matmul(np.linalg.pinv(_AtA), _Atb)
+        _AtA = np.sum(AtA, axis=(1, 2))
+        _Atb = np.sum(Atb, axis=(1, 2))
+        return np.matmul(np.linalg.pinv(_AtA), _Atb).transpose(2, 0, 1)
 
     def make_oracle_R(self, Rz: np.ndarray) -> np.ndarray:
         """
