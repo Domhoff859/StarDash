@@ -1,13 +1,14 @@
 import logging
 from math import isclose
 import numpy as np
+from typing import Optional
 
 from . import utils
 
 logger = logging.getLogger("Destar")
 
 class DestarRepresentation:
-    def __init__(self, model_info: dict, num_instances: int = None) -> None:
+    def __init__(self, model_info: dict, num_instances: Optional[int] = None) -> None:
         """
         Initialize the DestarRepresentation object.
 
@@ -21,7 +22,7 @@ class DestarRepresentation:
         # Set the number of instances
         self.num_instances = num_instances if num_instances is not None else 1
         
-    def calculate(self, star: np.ndarray, dash: np.ndarray, isvalid: np.ndarray, train_R: np.ndarray = None, object_id: str = None) -> np.ndarray:
+    def calculate(self, star: np.ndarray, dash: np.ndarray, isvalid: np.ndarray, train_R: Optional[np.ndarray] = None, object_id: Optional[str] = None) -> np.ndarray:
         """
         Calculate the Destar representation.
 
@@ -35,6 +36,9 @@ class DestarRepresentation:
         Returns:
             np.ndarray: Calculated Destar representation.
         """
+        # star = (np.array(star, dtype=np.float32) - 127.5) * np.sqrt(2) * 2
+        # dash = (np.array(dash, dtype=np.float32) - 127.5) * 2
+        
         if object_id is None:
             model_info = self.model_info
         else:
@@ -82,7 +86,7 @@ class DestarRepresentation:
         diff = (a - b) % (2 * np.pi)
         return np.minimum(diff, 2 * np.pi - diff)
     
-    def best_symmetrical_po(self, star0: np.ndarray, factor: int, axis: np.ndarray, train_R: np.ndarray, model_info: dict, postar: np.ndarray, vo: np.ndarray, iseg: np.ndarray) -> np.ndarray:
+    def best_symmetrical_po(self, star0: np.ndarray, factor: int, axis: np.ndarray, train_R: np.ndarray | None, model_info: dict, postar: np.ndarray, vo: np.ndarray, iseg: np.ndarray) -> np.ndarray:
         """
         Calculate the best symmetrical Po.
 
@@ -142,7 +146,7 @@ class DestarRepresentation:
 
         return np.sum(best_po2 * iseg[..., np.newaxis], axis=-2)
     
-    def best_continues_po(self, star0: np.ndarray, axis: np.ndarray, train_R: np.ndarray, postar: np.ndarray, vo: np.ndarray, iseg: np.ndarray) -> np.ndarray:
+    def best_continues_po(self, star0: np.ndarray, axis: np.ndarray, train_R: np.ndarray | None, postar: np.ndarray, vo: np.ndarray, iseg: np.ndarray) -> np.ndarray:
         """
         Calculate the best continuous Po.
 
@@ -208,8 +212,9 @@ class DestarRepresentation:
         
         batch_dims = 3
         batch_shape = best_po.shape[:batch_dims]
+        
         for idx in np.ndindex(batch_shape):
-            best_po2[idx] = best_po[idx + (arg_min_expanded_[idx],)]
+            best_po2[idx] = best_po[idx + (arg_min_expanded_[idx],)].squeeze(axis=1)
 
         return np.sum(best_po2 * iseg[..., np.newaxis], axis=-2)
     

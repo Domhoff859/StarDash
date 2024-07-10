@@ -1,4 +1,6 @@
 import logging
+import os
+from PIL import Image
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -45,7 +47,7 @@ class StarDash:
         
     def run(self):
         # for object_id in self.object_ids:
-        object_id = self.object_ids[5]
+        object_id = self.object_ids[0]
         logger.info(f'Working on object {object_id} of {self.object_ids[-1]}')
         
         # Load the ground truth data
@@ -70,10 +72,12 @@ class StarDash:
             inputs, valid_po, isvalid, depth, segmentation = dataset_conversion_layers(element, self.model_info[object_id], self.strides)
 
             # Calculate the star and dash representations
-            valid_star = self.star.calculate(object_id=object_id, po_image=valid_po)
-            valid_dash = self.dash.calculate(object_id=object_id ,R=inputs['rotationmatrix'], po_image=valid_po)
-            valid_destar = self.destar.calculate(object_id=object_id, star=valid_star, dash=valid_dash, isvalid=isvalid, train_R=inputs['rotationmatrix'])
+            valid_star = (self.star.calculate(object_id=object_id, po_image=valid_po) / np.sqrt(2) / 2 + 127.5).astype(np.uint8)
+            valid_dash = (self.dash.calculate(object_id=object_id ,R=inputs['rotationmatrix'], po_image=valid_po) / 2 + 127.5).astype(np.uint8)
+            valid_destar = (self.destar.calculate(object_id=object_id, star=valid_star, dash=valid_dash, isvalid=isvalid, train_R=inputs['rotationmatrix']) / np.sqrt(2) / 2 + 127.5).astype(np.uint8)
 
+            valid_po = (valid_po / np.sqrt(2) / 2 + 127.5).astype(np.uint8)
+            
             # Append the data to the lists
             all_rgb.append(inputs['rgb'])
             all_star.append(valid_star)
@@ -105,7 +109,7 @@ class StarDash:
         logger.warning(f'Segmentation shape: {all_segmentation.shape}, Type: {all_segmentation.dtype}')
         
         # Display the images
-        pic_numbers = np.random.randint(0, self.number_of_images, 1)
+        pic_numbers = np.random.randint(0, self.number_of_images, 10)
         for picture in pic_numbers:
             f, axarr = plt.subplots(2, 4)
             # Display images and set titles
@@ -130,6 +134,71 @@ class StarDash:
             plt.tight_layout()
             # Show the plot
             plt.show()
+            
+    def test(self):
+        obj_id = '1'
+        star_folder_path = os.path.join(self.dataset_path, 'xyz_data', obj_id, 'star')
+        dash_folder_path = os.path.join(self.dataset_path, 'xyz_data', obj_id, 'dash')
+        nocs_folder_path = os.path.join(self.dataset_path, 'xyz_data', obj_id, 'nocs')
+        train_R_folder_path = os.path.join(self.dataset_path, 'xyz_data', obj_id, 'cam_R_m2c')
+        
+        # Pick one random image from the star_path
+        star_files = os.listdir(star_folder_path)
+        random_file: str = np.random.choice(star_files)
+        
+        star_path = os.path.join(star_folder_path, random_file)
+        dash_path = os.path.join(dash_folder_path, random_file)
+        nocs_path = os.path.join(nocs_folder_path, random_file)
+        train_R_path = os.path.join(train_R_folder_path, random_file.replace('.png', '.npy'))
+
+        star_image = np.array(Image.open(star_path), dtype=np.uint8)
+        dash_image = np.array(Image.open(dash_path), dtype=np.uint8)
+        nocs_image = np.array(Image.open(nocs_path), dtype=np.uint8)
+        train_R = np.load(train_R_path)
+        
+        logger.critical(f'Max Nocs: {np.max(nocs_image)}')
+
+        # Calculate a mask from the star image by thresholding all three channels as > 5
+        mask = np.zeros(star_image.shape, dtype=np.uint8)
+        mask[(star_image[:,:,0] > 5) & (star_image[:,:,1] > 5) & (star_image[:,:,2] > 5)] = 255
+        
+        # Calculate the destar image
+        destar_image = self.destar.calculate(object_id=obj_id, star=star_image[np.newaxis, ...], dash=dash_image[np.newaxis, ...], isvalid=mask, train_R=train_R[np.newaxis,...])
+        destar_image = np.squeeze(destar_image, axis=0)
+        
+        valid_star = self.star.calculate(object_id=obj_id, po_image=nocs_image[np.newaxis, ...])
+        valid_dash = self.dash.calculate(object_id=obj_id ,R=train_R[np.newaxis,...], po_image=nocs_image[np.newaxis, ...])
+        valid_destar = self.destar.calculate(object_id=obj_id, star=valid_star, dash=valid_dash, isvalid=mask, train_R=train_R[np.newaxis,...])
+        
+        valid_star = np.squeeze(valid_star, axis=0)
+        valid_dash = np.squeeze(valid_dash, axis=0)
+        valid_destar = np.squeeze(valid_destar, axis=0)
+        
+        # Display the images
+        f, axarr = plt.subplots(2, 5)
+        # Display images and set titles
+        axarr[0,0].set_title('Star Image')
+        axarr[0,0].imshow(star_image)
+        axarr[1,0].set_title('Valid Star Image')
+        axarr[1,0].imshow(valid_star)
+        axarr[0,1].set_title('Dash Image')
+        axarr[0,1].imshow(dash_image)
+        axarr[1,1].set_title('Valid Dash Image')
+        axarr[1,1].imshow(valid_dash)
+        axarr[0,2].set_title('Mask')
+        axarr[0,2].imshow(mask)
+        axarr[0,3].set_title('NOCS Image')
+        axarr[0,3].imshow(nocs_image)
+        axarr[0,4].set_title('Destar Image')
+        axarr[0,4].imshow(destar_image)
+        axarr[1,4].set_title('Valid Destar Image')
+        axarr[1,4].imshow(valid_destar)
+        # Adjust layout to make space for titles
+        plt.tight_layout()
+        # Show the plot
+        plt.show()
+        
+        
 
 
 if __name__ == "__main__":
@@ -142,4 +211,5 @@ if __name__ == "__main__":
     # )
     stardash = StarDash(dataset_path="/home/domin/Documents/Datasets/tless/")
     stardash.run()
+    #stardash.test()
     
