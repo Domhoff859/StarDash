@@ -24,7 +24,7 @@ class DestarRepresentation:
         
     def calculate(self, star: np.ndarray, dash: np.ndarray, isvalid: np.ndarray, train_R: Optional[np.ndarray] = None, object_id: Optional[str] = None) -> np.ndarray:
         """
-        Calculate the Destar representation.
+        Calculate the Destar representation in NOCS space.
 
         Args:
             object_id (str): ID of the object.
@@ -36,21 +36,27 @@ class DestarRepresentation:
         Returns:
             np.ndarray: Calculated Destar representation.
         """
-        # star = (np.array(star, dtype=np.float32) - 127.5) * np.sqrt(2) * 2
-        # dash = (np.array(dash, dtype=np.float32) - 127.5) * 2
-        
         if object_id is None:
             model_info = self.model_info
         else:
             model_info = self.model_info[object_id]
         
+        # If star or dash are given as images (.png, .jpg, etc. | type = np.uint8) convert them 
+        # back into the correct format for destarring
+        if star.dtype == np.uint8:
+            star = (star.astype(np.float32) - 127.5) * np.sqrt(2) * 2
+        if dash.dtype == np.uint8:
+            dash = (dash.astype(np.float32) - 127.5) * np.sqrt(2) * 2
+        
         if model_info["symmetries_continuous"]:
             logger.debug("Destarring as symmetries_continuous")
-            return self.best_continues_po(star, np.array([0,0,1], np.float32), train_R, star, dash, isvalid)
+            result = self.best_continues_po(star, np.array([0,0,1], np.float32), train_R, star, dash, isvalid)
+            return np.array(np.where(result != 0, result / 255 / np.sqrt(2) / 2 + 127.5, 0), dtype=np.uint8)
 
         if len(model_info["symmetries_discrete"]) == 0:
             logger.debug("Destarring is not changing anything")
-            return star
+            result = star
+            return np.array(np.where(result != 0, result / 255 / np.sqrt(2) / 2 + 127.5, 0), dtype=np.uint8)
 
         if isclose(model_info["symmetries_discrete"][0][2,2], 1, abs_tol=1e-3):
             factor = len(model_info["symmetries_discrete"])+1
@@ -59,7 +65,8 @@ class DestarRepresentation:
 
             offset = model_info["symmetries_discrete"][0][:3,-1] / 2.
             logger.debug(f"Po was corrected by {-offset}")
-            return po_ - offset
+            result = po_ - offset
+            return np.array(np.where(result != 0, result / 255 / np.sqrt(2) / 2 + 127.5, 0), dtype=np.uint8)
 
         if isclose(model_info["symmetries_discrete"][0][1,1], 1, abs_tol=1e-3):
             factor = len(model_info["symmetries_discrete"])+1
@@ -68,7 +75,8 @@ class DestarRepresentation:
 
             offset = self.model_info["symmetries_discrete"][0][:3,-1] / 2.
             logger.debug(f"Po was corrected by {-offset}")
-            return po_
+            result = po_
+            return np.array(np.where(result != 0, result / 255 / np.sqrt(2) / 2 + 127.5, 0), dtype=np.uint8)
         
         assert(False)        
         
