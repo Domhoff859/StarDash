@@ -151,16 +151,14 @@ class StarDash:
         nocs_path = os.path.join(nocs_folder_path, random_file)
         train_R_path = os.path.join(train_R_folder_path, random_file.replace('.png', '.npy'))
 
-        star_image = np.array(Image.open(star_path), dtype=np.uint8)
-        dash_image = np.array(Image.open(dash_path), dtype=np.uint8)
-        nocs_image = np.array(Image.open(nocs_path), dtype=np.uint8)
+        star_image = np.array(Image.open(star_path), dtype=np.float32) - 127.5
+        dash_image = np.array(Image.open(dash_path), dtype=np.float32) - 127.5
+        nocs_image = np.array(Image.open(nocs_path), dtype=np.float32) - 127.5
         train_R = np.load(train_R_path)
-        
-        logger.critical(f'Max Nocs: {np.max(nocs_image)}')
 
         # Calculate a mask from the star image by thresholding all three channels as > 5
         mask = np.zeros(star_image.shape, dtype=np.uint8)
-        mask[(star_image[:,:,0] > 5) & (star_image[:,:,1] > 5) & (star_image[:,:,2] > 5)] = 255
+        mask[(star_image[:,:,0] > 5) | (star_image[:,:,1] > 5) | (star_image[:,:,2] > 5)] = 255
         
         # Calculate the destar image
         destar_image = self.destar.calculate(object_id=obj_id, star=star_image[np.newaxis, ...], dash=dash_image[np.newaxis, ...], isvalid=mask, train_R=train_R[np.newaxis,...])
@@ -169,30 +167,49 @@ class StarDash:
         valid_star = self.star.calculate(object_id=obj_id, po_image=nocs_image[np.newaxis, ...])
         valid_dash = self.dash.calculate(object_id=obj_id ,R=train_R[np.newaxis,...], po_image=nocs_image[np.newaxis, ...])
         valid_destar = self.destar.calculate(object_id=obj_id, star=valid_star, dash=valid_dash, isvalid=mask, train_R=train_R[np.newaxis,...])
+
+        nocs_image = np.array(nocs_image + 127.5, dtype=np.uint8)
+        valid_star = np.array(valid_star / np.sqrt(2) / 2 + 127.5, dtype=np.uint8)
+        valid_dash = np.array(valid_dash / np.sqrt(2) / 2 + 127.5, dtype=np.uint8)
+        valid_destar = np.array(np.where(valid_destar != 0, valid_destar / 255 / np.sqrt(2) / 2 + 127.5, 0), dtype=np.uint8)
+        valid_destar2 = self.destar.calculate(object_id=obj_id, star=np.array((valid_star.astype(np.float32) - 127.5) * np.sqrt(2) * 2), dash=np.array((valid_dash.astype(np.float32) - 127.5) * np.sqrt(2) * 2), isvalid=mask, train_R=train_R[np.newaxis,...])
+        valid_destar2 = np.array(np.where(valid_destar2 != 0, valid_destar2 / 255 / np.sqrt(2) / 2 + 127.5, 0), dtype=np.uint8)
+        
+        logger.critical(f'Max Error = {np.max(np.abs(nocs_image - valid_destar))}')
+        logger.critical(f'Min Error = {np.min(np.abs(nocs_image - valid_destar))}')
+        logger.critical(f'Mean Error = {np.mean(np.abs(nocs_image - valid_destar))}')
         
         valid_star = np.squeeze(valid_star, axis=0)
         valid_dash = np.squeeze(valid_dash, axis=0)
         valid_destar = np.squeeze(valid_destar, axis=0)
+        valid_destar2 = np.squeeze(valid_destar2, axis=0)
+        
+        logger.critical(f'Max Nocs: {np.max(np.array(nocs_image))}')
+        logger.critical(f'Min Nocs: {np.min(np.array(nocs_image))}')
+        logger.critical(f'Max Valid Destar: {np.max(valid_destar)}')
+        logger.critical(f'Min Valid Destar: {np.min(valid_destar)}')
+        logger.critical(f'Max Valid Destar2: {np.max(valid_destar2)}')
+        logger.critical(f'Min Valid Destar2: {np.min(valid_destar2)}')
+        logger.critical(f'Max Valid Star: {np.max(valid_star)}')
+        logger.critical(f'Min Valid Star: {np.min(valid_star)}')
+        logger.critical(f'Max Valid Dash: {np.max(valid_dash)}')
+        logger.critical(f'Min Valid Dash: {np.min(valid_dash)}')
         
         # Display the images
-        f, axarr = plt.subplots(2, 5)
+        f, axarr = plt.subplots(1, 6)
         # Display images and set titles
-        axarr[0,0].set_title('Star Image')
-        axarr[0,0].imshow(star_image)
-        axarr[1,0].set_title('Valid Star Image')
-        axarr[1,0].imshow(valid_star)
-        axarr[0,1].set_title('Dash Image')
-        axarr[0,1].imshow(dash_image)
-        axarr[1,1].set_title('Valid Dash Image')
-        axarr[1,1].imshow(valid_dash)
-        axarr[0,2].set_title('Mask')
-        axarr[0,2].imshow(mask)
-        axarr[0,3].set_title('NOCS Image')
-        axarr[0,3].imshow(nocs_image)
-        axarr[0,4].set_title('Destar Image')
-        axarr[0,4].imshow(destar_image)
-        axarr[1,4].set_title('Valid Destar Image')
-        axarr[1,4].imshow(valid_destar)
+        axarr[0].set_title('Valid Star Image')
+        axarr[0].imshow(valid_star)
+        axarr[1].set_title('Valid Dash Image')
+        axarr[1].imshow(valid_dash)
+        axarr[2].set_title('Mask')
+        axarr[2].imshow(mask)
+        axarr[3].set_title('NOCS Image')
+        axarr[3].imshow(nocs_image)
+        axarr[4].set_title('Valid Destar Image')
+        axarr[4].imshow(valid_destar)
+        axarr[5].set_title('Valid Destar2 Image')
+        axarr[5].imshow(valid_destar2)
         # Adjust layout to make space for titles
         plt.tight_layout()
         # Show the plot
@@ -210,6 +227,6 @@ if __name__ == "__main__":
     #     dataset_path=args.dataset_path
     # )
     stardash = StarDash(dataset_path="/home/domin/Documents/Datasets/tless/")
-    stardash.run()
-    #stardash.test()
+    # stardash.run()
+    stardash.test()
     
