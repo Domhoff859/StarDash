@@ -44,24 +44,23 @@ class DestarRepresentation:
         # If star or dash are given as images (.png, .jpg, etc. | type = np.uint8) convert them 
         # back into the correct format for destarring
         if star.dtype == np.uint8:
-            star = np.array((star.astype(np.float64) - 127.5) * np.sqrt(2) * 2, dtype=np.float64)
+            symmetry_star = np.array((star.astype(np.float64) - 127.5) * np.sqrt(2) * 2, dtype=np.float64)
         if dash.dtype == np.uint8:
             dash = np.array((dash.astype(np.float64) - 127.5) * np.sqrt(2) * 2, dtype=np.float64)
         
         if model_info["symmetries_continuous"]:
             logger.debug("Destarring as symmetries_continuous")
-            result = self.best_continues_po(star, np.array([0,0,1], np.float32), train_R, star, dash, isvalid)
+            result = self.best_continues_po(symmetry_star, np.array([0,0,1], np.float32), train_R, symmetry_star, dash, isvalid)
             return np.array(np.where(result != 0, result / 255 + 127.5, 0), dtype=np.uint8)
 
         if len(model_info["symmetries_discrete"]) == 0:
             logger.debug("Destarring is not changing anything")
-            result = star
-            return np.array(np.where(result != 0, result / 255 + 127.5, 0), dtype=np.uint8)
+            return star
 
         if isclose(model_info["symmetries_discrete"][0][2,2], 1, abs_tol=1e-3):
             factor = len(model_info["symmetries_discrete"])+1
             logger.debug(f"Destarring as symmetries_discrete with z_factor= {factor}")
-            po_ = self.best_symmetrical_po(self.get_obj_star0_from_obj_star(star, z_factor=factor), factor, np.array([0,0,1], np.float32), train_R, model_info, star, dash, isvalid)
+            po_ = self.best_symmetrical_po(self.get_obj_star0_from_obj_star(symmetry_star, z_factor=factor), factor, np.array([0,0,1], np.float32), train_R, model_info, symmetry_star, dash, isvalid)
 
             offset = model_info["symmetries_discrete"][0][:3,-1] / 2.
             logger.debug(f"Po was corrected by {-offset}")
@@ -71,7 +70,7 @@ class DestarRepresentation:
         if isclose(model_info["symmetries_discrete"][0][1,1], 1, abs_tol=1e-3):
             factor = len(model_info["symmetries_discrete"])+1
             logger.debug(f"Destarring as symmetries_discrete with y_factor= {factor}")
-            po_ = self.best_symmetrical_po(self.get_obj_star0_from_obj_star(star, y_factor=factor), factor, np.array([0,1,0], np.float32), train_R, model_info, star, dash, isvalid)
+            po_ = self.best_symmetrical_po(self.get_obj_star0_from_obj_star(symmetry_star, y_factor=factor), factor, np.array([0,1,0], np.float32), train_R, model_info, symmetry_star, dash, isvalid)
 
             offset = self.model_info["symmetries_discrete"][0][:3,-1] / 2.
             logger.debug(f"Po was corrected by {-offset}")
